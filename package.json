@@ -1,0 +1,27 @@
+{
+  "name": "mern-e-commerce",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/ayushgupta344/MERN-E-COMMERCE#readme",
+  "bugs": {
+    "url": "https://github.com/ayushgupta344/MERN-E-COMMERCE/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayushgupta344/MERN-E-COMMERCE.git"
+  },
+  "license": "ISC",
+  "author": "Ayush Gupta",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "install": "cd backend && npm install && cd ../frontend && npm install",
+    "dev:server": "cd backend && npm run dev",  
+    "dev:client": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build": "cd frontend && npm run build"
+  },
+  "dependencies": {
+    "concurrently": "^10.0.4"
+  }
+}
