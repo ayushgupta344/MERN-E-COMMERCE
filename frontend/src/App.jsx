@@ -9,6 +9,11 @@ import Disclaimer from './pages/Disclaimer'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ProductDetail from './pages/ProductDetail'
+import Cart from './pages/Cart'
+import Checkout from './pages/Checkout'
+import OrderSuccess from './pages/OrderSuccess'
+import Profile from './pages/Profile'
+import Shop from './pages/Shop'
 export default function App() {
   return (
     <Router>
@@ -20,7 +25,12 @@ export default function App() {
         <Route path="/disclaimer" element={<Disclaimer />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/product/:id" element={<ProductDetail/>}/>
+        <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/ordersuccess" element={<OrderSuccess/>}/>
+        <Route path="/profile" element={<Profile/>}/>
+        <Route path="/shop" element={<Shop/>}/>
       </Routes>
       <Footer />
     </Router>
