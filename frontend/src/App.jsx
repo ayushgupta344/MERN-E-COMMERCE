@@ -14,6 +14,12 @@ import Checkout from './pages/Checkout'
 import OrderSuccess from './pages/OrderSuccess'
 import Profile from './pages/Profile'
 import Shop from './pages/Shop'
+import AdminDashboard from './admin/AdminDashboard'
+import AddProduct from './admin/AddProduct'
+import AdminProducts from './admin/AdminProducts'
+import EditProduct from './admin/EditProducts'
+import AdminOrders from './admin/AdminOrders'
+import AdminUsers from './admin/AdminUsers'
 export default function App() {
   return (
     <Router>
@@ -28,9 +34,15 @@ export default function App() {
         <Route path="/product/:id" element={<ProductDetail />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
-        <Route path="/ordersuccess" element={<OrderSuccess/>}/>
-        <Route path="/profile" element={<Profile/>}/>
-        <Route path="/shop" element={<Shop/>}/>
+        <Route path="/ordersuccess" element={<OrderSuccess />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/shop" element={<Shop />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/add-product" element={<AddProduct />} />
+        <Route path="/admin/products" element={<AdminProducts />} />
+        <Route path="/admin/edit-product/:id" element={<EditProduct />} />
+        <Route path="/admin/orders" element={<AdminOrders />} />
+        <Route path="/admin/users" element={<AdminUsers/>} />
       </Routes>
       <Footer />
     </Router>
