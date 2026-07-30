@@ -1,6 +1,8 @@
+
 import React, { useEffect, useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const EditProduct = () => {
   const { id } = useParams();
@@ -16,21 +18,35 @@ const EditProduct = () => {
   });
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     const fetchProduct = async () => {
-      const res = await fetch(`/api/products/${id}`);
-      const data = await res.json();
-      setFormData({
-        name: data.name,
-        description: data.description,
-        price: data.price,
-        category: data.category,
-        stock: data.stock,
-      });
+      try {
+        const res = await fetch(`/api/products/${id}`);
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.message || "Product not found");
+          navigate("/admin/products");
+          return;
+        }
+        setFormData({
+          name: data.name,
+          description: data.description,
+          price: data.price,
+          category: data.category,
+          stock: data.stock,
+        });
+      } catch (error) {
+        console.error(error);
+        toast.error("Could not load this product");
+        navigate("/admin/products");
+      } finally {
+        setFetching(false);
+      }
     };
     fetchProduct();
-  }, [id]);
+  }, [id, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,17 +59,34 @@ const EditProduct = () => {
     data.append("stock", formData.stock);
     if (image) data.append("image", image);
 
-    const res = await fetch(`/api/products/${id}`, {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${user.token}` },
-      body: data,
-    });
-    setLoading(false);
-    if (res.ok) {
-      alert("Product updated successfully!");
-      navigate("/admin/products");
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${user.token}` },
+        body: data,
+      });
+      const responseData = await res.json();
+      if (res.ok) {
+        toast.success("Product updated successfully!");
+        navigate("/admin/products");
+      } else {
+        toast.error(responseData.message || "Error updating product");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (fetching) {
+    return (
+      <div style={{ textAlign: "center", margin: "100px", color: "#f97316" }}>
+        Loading product...
+      </div>
+    );
+  }
 
   return (
     <div
@@ -93,6 +126,8 @@ const EditProduct = () => {
           type="number"
           placeholder="Price"
           required
+          min="0"
+          step="0.01"
           value={formData.price}
           onChange={(e) => setFormData({ ...formData, price: e.target.value })}
           style={inputStyle}
@@ -111,6 +146,7 @@ const EditProduct = () => {
           type="number"
           placeholder="Stock"
           required
+          min="0"
           value={formData.stock}
           onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
           style={inputStyle}

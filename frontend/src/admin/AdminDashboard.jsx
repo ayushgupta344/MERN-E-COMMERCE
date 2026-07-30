@@ -1,6 +1,10 @@
+
 import React, { useEffect, useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import Spinner from "../components/Spinner";
+import "../styles/admin.css";
 
 const AdminDashboard = () => {
   const { user } = useContext(AuthContext);
@@ -8,11 +12,6 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    if (!user || user.role !== "admin") {
-      navigate("/");
-      return;
-    }
-
     const fetchStats = async () => {
       try {
         const res = await fetch("/api/analytics", {
@@ -25,6 +24,7 @@ const AdminDashboard = () => {
           if (res.status === 401) {
             navigate("/login");
           }
+          toast.error(data.message || "Could not load dashboard stats");
           setStats({
             totalOrders: 0,
             totalProducts: 0,
@@ -34,29 +34,11 @@ const AdminDashboard = () => {
         }
       } catch (error) {
         console.error(error);
+        toast.error("Could not load dashboard stats");
       }
     };
     fetchStats();
   }, [user, navigate]);
-
-  const cardStyle = {
-    padding: "25px",
-    background: "#18181b",
-    border: "1px solid rgba(255, 255, 255, 0.05)",
-    borderRadius: "12px",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-    textAlign: "center",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    gap: "10px",
-  };
-
-  const numberStyle = {
-    fontSize: "2.5rem",
-    fontWeight: "700",
-    color: "#f97316",
-  };
 
   return (
     <div style={{ padding: "20px", maxWidth: "1000px", margin: "0 auto" }}>
@@ -86,40 +68,26 @@ const AdminDashboard = () => {
       </p>
 
       {stats ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "20px",
-          }}
-        >
-          <div style={cardStyle}>
-            <h4 style={{ color: "#a1a1aa", fontSize: "1rem" }}>Total Orders</h4>
-            <div style={numberStyle}>{stats.totalOrders}</div>
+        <div className="stat-grid">
+          <div className="stat-card">
+            <h4>Total Orders</h4>
+            <div className="stat-number">{stats.totalOrders}</div>
           </div>
-          <div style={cardStyle}>
-            <h4 style={{ color: "#a1a1aa", fontSize: "1rem" }}>
-              Total Products
-            </h4>
-            <div style={numberStyle}>{stats.totalProducts}</div>
+          <div className="stat-card">
+            <h4>Total Products</h4>
+            <div className="stat-number">{stats.totalProducts}</div>
           </div>
-          <div style={cardStyle}>
-            <h4 style={{ color: "#a1a1aa", fontSize: "1rem" }}>Total Users</h4>
-            <div style={numberStyle}>{stats.totalUsers}</div>
+          <div className="stat-card">
+            <h4>Total Users</h4>
+            <div className="stat-number">{stats.totalUsers}</div>
           </div>
-          <div style={cardStyle}>
-            <h4 style={{ color: "#a1a1aa", fontSize: "1rem" }}>
-              Total Revenue
-            </h4>
-            <div style={numberStyle}>₹{stats.totalRevenue.toFixed(2)}</div>
+          <div className="stat-card">
+            <h4>Total Revenue</h4>
+            <div className="stat-number">₹{stats.totalRevenue.toFixed(2)}</div>
           </div>
         </div>
       ) : (
-        <div
-          style={{ textAlign: "center", margin: "50px 0", color: "#f97316" }}
-        >
-          Loading metrics...
-        </div>
+        <Spinner label="Loading metrics..." />
       )}
 
       <div
@@ -134,7 +102,7 @@ const AdminDashboard = () => {
         <h3 style={{ marginBottom: "25px", color: "#f97316" }}>
           Administrative Controls
         </h3>
-        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+        <div className="quick-actions">
           <button
             className="btn"
             onClick={() => navigate("/admin/add-product")}

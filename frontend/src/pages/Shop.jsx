@@ -1,5 +1,8 @@
+
 import React, { useEffect, useState } from "react";
 import ProductCard from "../components/ProductCard";
+import Spinner from "../components/Spinner";
+import toast from "react-hot-toast";
 import "../styles/product.css";
 
 const Shop = () => {
@@ -15,6 +18,7 @@ const Shop = () => {
         setProducts(data);
       } catch (error) {
         console.error(error);
+        toast.error("Could not load products right now");
       } finally {
         setLoading(false);
       }
@@ -37,7 +41,13 @@ const Shop = () => {
         className="search-bar"
       />
       {loading ? (
-        <div>Loading...</div>
+        <Spinner label="Loading products..." />
+      ) : filteredProducts.length === 0 ? (
+        <p style={{ color: "#a1a1aa" }}>
+          {search
+            ? `No products match "${search}".`
+            : "No products available right now."}
+        </p>
       ) : (
         <div className="product-grid">
           {filteredProducts.map((product) => (

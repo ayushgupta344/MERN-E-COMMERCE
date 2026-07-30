@@ -1,7 +1,10 @@
+
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch } from "react-redux";
+import toast from "react-hot-toast";
 import { addToCart } from "../redux/cartSlice";
+import Spinner from "../components/Spinner";
 import "../styles/product.css";
 
 const ProductDetail = () => {
@@ -26,26 +29,23 @@ const ProductDetail = () => {
   }, [id]);
 
   const handleAddToCart = () => {
-    if (product) {
-      dispatch(
-        addToCart({
-          productId: product._id,
-          name: product.name,
-          price: product.price,
-          imageUrl: product.imageUrl,
-          qty: 1,
-        }),
-      );
-      alert("Successfully added to your cart!");
+    if (!product || product.stock <= 0) {
+      toast.error("This product is out of stock");
+      return;
     }
+    dispatch(
+      addToCart({
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+        imageUrl: product.imageUrl,
+        qty: 1,
+      }),
+    );
+    toast.success(`${product.name} added to your cart!`);
   };
 
-  if (loading)
-    return (
-      <div style={{ textAlign: "center", margin: "100px", color: "#f97316" }}>
-        Loading Product...
-      </div>
-    );
+  if (loading) return <Spinner fullPage label="Loading product..." />;
   if (!product)
     return (
       <div style={{ textAlign: "center", margin: "100px", color: "#ef4444" }}>
@@ -111,9 +111,16 @@ const ProductDetail = () => {
             <button
               onClick={handleAddToCart}
               className="btn"
-              style={{ flexGrow: "1", padding: "18px", fontSize: "1.2rem" }}
+              disabled={product.stock <= 0}
+              style={{
+                flexGrow: "1",
+                padding: "18px",
+                fontSize: "1.2rem",
+                opacity: product.stock <= 0 ? 0.5 : 1,
+                cursor: product.stock <= 0 ? "not-allowed" : "pointer",
+              }}
             >
-              Add to Shopping Cart
+              {product.stock <= 0 ? "Out of Stock" : "Add to Shopping Cart"}
             </button>
           </div>
 

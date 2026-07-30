@@ -1,3 +1,4 @@
+
 import React, { useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
@@ -7,6 +8,7 @@ import "../styles/navbar.css";
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
   const cartItems = useSelector((state) => state.cart.cartItems);
+  const cartCount = cartItems.reduce((total, item) => total + item.qty, 0);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -37,7 +39,7 @@ const Navbar = () => {
           <Link to="/shop">Shop</Link>
         </li>
         <li>
-          <Link to="/cart">Cart ({cartItems.length})</Link>
+          <Link to="/cart">Cart ({cartCount})</Link>
         </li>
         {user ? (
           <>

@@ -1,6 +1,8 @@
-import React, { useState, useContext } from "react";
+
+import React, { useState, useContext, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { AuthContext } from "../context/AuthContext";
 import { clearCart } from "../redux/cartSlice";
 
@@ -9,6 +11,7 @@ const Checkout = () => {
   const cartItems = useSelector((state) => state.cart.cartItems);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [processing, setProcessing] = useState(false);
 
   const [address, setAddress] = useState({
     fullName: "",
@@ -18,12 +21,51 @@ const Checkout = () => {
     country: "",
   });
 
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      toast("Your cart is empty", { icon: "🛒" });
+      navigate("/shop");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const totalPrice = cartItems.reduce(
     (acc, item) => acc + item.price * item.qty,
     0,
   );
 
+  const saveOrder = async (paymentId) => {
+    const saveOrderRes = await fetch("/api/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${user.token}`,
+      },
+      body: JSON.stringify({
+        items: cartItems,
+        totalAmount: totalPrice,
+        address,
+        paymentId,
+      }),
+    });
+    const data = await saveOrderRes.json();
+    if (saveOrderRes.ok) {
+      dispatch(clearCart());
+      navigate("/ordersuccess");
+    } else {
+      toast.error(data.message || "Order could not be saved");
+    }
+    return saveOrderRes.ok;
+  };
+
+  const runDemoPayment = async () => {
+    // Used when Razorpay isn't configured on the backend yet, so the
+    // checkout flow is still demonstrable end-to-end without live keys.
+    await saveOrder("demo_txn_" + Date.now());
+  };
+
   const handlePayment = async () => {
+    setProcessing(true);
     try {
       const orderRes = await fetch("/api/payment/order", {
         method: "POST",
@@ -31,55 +73,52 @@ const Checkout = () => {
         body: JSON.stringify({ amount: totalPrice }),
       });
       const orderData = await orderRes.json();
-      console.log(import.meta.env.VITE_RAZORPAY_KEY_ID);
+
       if (!orderRes.ok) {
-        // Razorpay unconfigured exception handler
-        const fallback = window.confirm(
-          "Razorpay keys unconfigured on backend. Use Student Bypass Mode to place test order?",
+        const useDemoMode = window.confirm(
+          "Online payments aren't configured on this server yet.\n\nContinue with a demo order instead?",
         );
-        if (fallback) {
-          return bypassPayment();
+        if (useDemoMode) {
+          await runDemoPayment();
         } else {
-          return alert("Payment failed to initialize");
+          toast.error("Payment could not be initialized");
         }
+        return;
       }
+
+      if (!window.Razorpay) {
+        toast.error(
+          "Payment gateway failed to load. Please refresh and try again.",
+        );
+        return;
+      }
+
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // Student dummy fallback
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: orderData.amount,
         currency: orderData.currency,
         name: "ShopNest",
-        description: "Test Transaction",
+        description: "Order Payment",
         order_id: orderData.id,
         handler: async function (response) {
-          const verifyRes = await fetch("/api/payment/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(response),
-          });
-          if (verifyRes.ok) {
-            const saveOrderRes = await fetch("/api/orders", {
+          try {
+            const verifyRes = await fetch("/api/payment/verify", {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${user.token}`,
-              },
-              body: JSON.stringify({
-                items: cartItems,
-                totalAmount: totalPrice,
-                address,
-                paymentId: response.razorpay_payment_id,
-              }),
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
             });
-
-            if (saveOrderRes.ok) {
-              dispatch(clearCart());
-              navigate("/ordersuccess");
+            if (verifyRes.ok) {
+              await saveOrder(response.razorpay_payment_id);
             } else {
-              alert("Order saving failed");
+              toast.error("Payment verification failed");
             }
-          } else {
-            alert("Payment verification failed");
+          } catch (error) {
+            console.error(error);
+            toast.error("Something went wrong while confirming your payment");
           }
+        },
+        modal: {
+          ondismiss: () => setProcessing(false),
         },
         prefill: {
           name: address.fullName,
@@ -95,38 +134,23 @@ const Checkout = () => {
       rzp1.open();
     } catch (error) {
       console.error(error);
-    }
-  };
-
-  const bypassPayment = async () => {
-    const saveOrderRes = await fetch("/api/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${user.token}`,
-      },
-      body: JSON.stringify({
-        items: cartItems,
-        totalAmount: totalPrice,
-        address,
-        paymentId: "bypass_txn_" + Date.now(),
-      }),
-    });
-    if (saveOrderRes.ok) {
-      dispatch(clearCart());
-      navigate("/ordersuccess");
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setProcessing(false);
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!user) {
-      alert("Please login first");
-      navigate("/login");
+      toast.error("Please login first");
+      navigate("/login", { state: { from: "/checkout" } });
       return;
     }
     handlePayment();
   };
+
+  if (cartItems.length === 0) return null;
 
   return (
     <div className="checkout-container">
@@ -177,8 +201,8 @@ const Checkout = () => {
           />
           <div className="checkout-summary">
             <h4>Total to Pay: ₹{totalPrice.toFixed(2)}</h4>
-            <button type="submit" className="btn">
-              Pay Now
+            <button type="submit" className="btn" disabled={processing}>
+              {processing ? "Processing..." : "Pay Now"}
             </button>
           </div>
         </form>

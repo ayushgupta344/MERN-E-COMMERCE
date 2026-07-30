@@ -1,17 +1,19 @@
-import React, { useState, useContext } from "react";
+
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
+import toast from "react-hot-toast";
 import "../styles/auth.css";
 
 const Register = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login } = useContext(AuthContext);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
@@ -20,16 +22,16 @@ const Register = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(
-          "Registration Successful! Please check your email for the Welcome OTP.",
-        );
-        login(data);
-        navigate("/");
+        toast.success(data.message || "Check your email for the OTP");
+        navigate("/verify-otp", { state: { email: data.email || email } });
       } else {
-        alert(data.message);
+        toast.error(data.message || "Registration failed");
       }
     } catch (error) {
       console.error(error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -53,13 +55,14 @@ const Register = () => {
         />
         <input
           type="password"
-          placeholder="Password"
+          placeholder="Password (min. 6 characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          minLength={6}
           required
         />
-        <button type="submit" className="btn">
-          Register
+        <button type="submit" className="btn" disabled={loading}>
+          {loading ? "Creating account..." : "Register"}
         </button>
         <p>
           Already have an account? <Link to="/login">Login</Link>

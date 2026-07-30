@@ -1,6 +1,9 @@
+
 import React, { useEffect, useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
+import toast from "react-hot-toast";
+import Spinner from "../components/Spinner";
 
 const Profile = () => {
   const { user, logout } = useContext(AuthContext);
@@ -9,10 +12,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
+    if (!user) return;
     const fetchMyOrders = async () => {
       try {
         const res = await fetch("/api/orders/myorders", {
@@ -31,12 +31,13 @@ const Profile = () => {
         }
       } catch (error) {
         console.error(error);
+        toast.error("Could not load your orders");
       } finally {
         setLoading(false);
       }
     };
     fetchMyOrders();
-  }, [user, navigate]);
+  }, [user, navigate, logout]);
 
   const handleLogout = () => {
     logout();
@@ -119,7 +120,7 @@ const Profile = () => {
         Order History
       </h3>
       {loading ? (
-        <p style={{ color: "#a1a1aa" }}>Fetching your orders...</p>
+        <Spinner label="Fetching your orders..." />
       ) : orders.length === 0 ? (
         <div
           style={{

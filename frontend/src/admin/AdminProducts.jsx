@@ -1,123 +1,126 @@
+
 import React, { useEffect, useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
+import Spinner from "../components/Spinner";
+import "../styles/admin.css";
+
+const stockBadge = (stock) => {
+  if (stock <= 0)
+    return <span className="stock-pill stock-out">Out of stock</span>;
+  if (stock <= 5)
+    return <span className="stock-pill stock-low">{stock} left</span>;
+  return <span className="stock-pill stock-ok">{stock} in stock</span>;
+};
 
 const AdminProducts = () => {
   const { user } = useContext(AuthContext);
   const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProducts = async () => {
-      const res = await fetch("/api/products");
-      const data = await res.json();
-      setProducts(Array.isArray(data) ? data : []);
+      try {
+        const res = await fetch("/api/products");
+        const data = await res.json();
+        setProducts(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error(error);
+        toast.error("Could not load products");
+      } finally {
+        setLoading(false);
+      }
     };
     fetchProducts();
   }, []);
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you strictly sure you want to delete this?")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this product? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    try {
       const res = await fetch(`/api/products/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (res.ok) {
-        setProducts(products.filter((p) => p._id !== id));
+        setProducts((prev) => prev.filter((p) => p._id !== id));
+        toast.success("Product deleted");
+      } else {
+        const data = await res.json();
+        toast.error(data.message || "Could not delete product");
       }
+    } catch (error) {
+      console.error(error);
+      toast.error("Something went wrong. Please try again.");
     }
   };
 
   return (
-    <div style={containerStyle}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "20px",
-        }}
-      >
-        <h2 style={{ color: "#f97316" }}>Manage Products</h2>
+    <div className="admin-panel">
+      <div className="admin-header">
+        <h2>
+          Manage <span>Products</span>
+        </h2>
         <Link to="/admin/add-product" className="btn">
           + Add Product
         </Link>
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={tableStyle}>
-          <thead>
-            <tr style={rowStyle}>
-              <th style={thStyle}>ID</th>
-              <th style={thStyle}>NAME</th>
-              <th style={thStyle}>PRICE</th>
-              <th style={thStyle}>CATEGORY</th>
-              <th style={thStyle}>STOCK</th>
-              <th style={thStyle}>ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((product) => (
-              <tr key={product._id} style={rowStyle}>
-                <td style={tdStyle}>{product._id.substring(0, 8)}...</td>
-                <td style={tdStyle}>{product.name}</td>
-                <td style={tdStyle}>₹{product.price.toFixed(2)}</td>
-                <td style={tdStyle}>{product.category}</td>
-                <td style={tdStyle}>{product.stock}</td>
-                <td style={tdStyle}>
-                  <Link
-                    to={`/admin/edit-product/${product._id}`}
-                    style={editBtn}
-                  >
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(product._id)}
-                    style={deleteBtn}
-                  >
-                    Delete
-                  </button>
-                </td>
+      {loading ? (
+        <Spinner label="Loading products..." />
+      ) : products.length === 0 ? (
+        <p className="admin-empty">
+          No products yet. Add your first one to get started.
+        </p>
+      ) : (
+        <div className="admin-table-wrapper">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Category</th>
+                <th>Stock</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {products.map((product) => (
+                <tr key={product._id}>
+                  <td className="mono">{product._id.substring(0, 8)}...</td>
+                  <td>{product.name}</td>
+                  <td>₹{product.price.toFixed(2)}</td>
+                  <td>{product.category}</td>
+                  <td>{stockBadge(product.stock)}</td>
+                  <td>
+                    <Link
+                      to={`/admin/edit-product/${product._id}`}
+                      className="icon-btn icon-btn-edit"
+                    >
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(product._id)}
+                      className="icon-btn icon-btn-delete"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
-};
-
-const containerStyle = {
-  maxWidth: "1200px",
-  margin: "40px auto",
-  padding: "30px",
-  background: "#18181b",
-  borderRadius: "12px",
-  border: "1px solid rgba(255,255,255,0.05)",
-  color: "#fafafa",
-};
-const tableStyle = { width: "100%", borderCollapse: "collapse" };
-const rowStyle = { borderBottom: "1px solid rgba(255,255,255,0.1)" };
-const thStyle = {
-  padding: "15px",
-  textAlign: "left",
-  color: "#a1a1aa",
-  fontSize: "0.9rem",
-};
-const tdStyle = { padding: "15px", textAlign: "left" };
-const editBtn = {
-  background: "#3b82f6",
-  color: "#fff",
-  padding: "6px 12px",
-  borderRadius: "4px",
-  marginRight: "10px",
-};
-const deleteBtn = {
-  background: "#ef4444",
-  color: "#fff",
-  padding: "6px 12px",
-  borderRadius: "4px",
-  border: "none",
-  cursor: "pointer",
 };
 
 export default AdminProducts;

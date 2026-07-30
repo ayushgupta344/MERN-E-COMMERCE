@@ -1,6 +1,8 @@
-import React, { useState, useContext } from "react";
+
+import React, { useState, useContext, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const AddProduct = () => {
   const { user } = useContext(AuthContext);
@@ -14,16 +16,32 @@ const AddProduct = () => {
     stock: "",
   });
   const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  if (!user || user.role !== "admin") {
-    navigate("/");
-    return null;
-  }
+  // AdminRoute already guards this page, but this stays as a defensive
+  // second check in case the component is ever reused elsewhere.
+  useEffect(() => {
+    if (!user || user.role !== "admin") {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (!image) {
+      setPreview(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(image);
+    setPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [image]);
+
+  if (!user || user.role !== "admin") return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!image) return alert("Please select an image");
+    if (!image) return toast.error("Please select an image");
 
     setLoading(true);
     const data = new FormData();
@@ -43,13 +61,14 @@ const AddProduct = () => {
       const responseData = await res.json();
 
       if (res.ok) {
-        alert("Product created successfully with Cloudinary Image URL!");
-        navigate("/shop");
+        toast.success("Product created successfully!");
+        navigate("/admin/products");
       } else {
-        alert(responseData.message || "Error creating product");
+        toast.error(responseData.message || "Error creating product");
       }
     } catch (error) {
       console.error(error);
+      toast.error("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -77,6 +96,7 @@ const AddProduct = () => {
           type="text"
           placeholder="Product Name"
           required
+          value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           style={inputStyle}
         />
@@ -84,6 +104,7 @@ const AddProduct = () => {
           placeholder="Description"
           required
           rows="4"
+          value={formData.description}
           onChange={(e) =>
             setFormData({ ...formData, description: e.target.value })
           }
@@ -93,6 +114,9 @@ const AddProduct = () => {
           type="number"
           placeholder="Price"
           required
+          min="0"
+          step="0.01"
+          value={formData.price}
           onChange={(e) => setFormData({ ...formData, price: e.target.value })}
           style={inputStyle}
         />
@@ -100,6 +124,7 @@ const AddProduct = () => {
           type="text"
           placeholder="Category"
           required
+          value={formData.category}
           onChange={(e) =>
             setFormData({ ...formData, category: e.target.value })
           }
@@ -109,6 +134,8 @@ const AddProduct = () => {
           type="number"
           placeholder="Stock Quantity"
           required
+          min="0"
+          value={formData.stock}
           onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
           style={inputStyle}
         />
@@ -132,6 +159,18 @@ const AddProduct = () => {
             onChange={(e) => setImage(e.target.files[0])}
             style={{ color: "#fff" }}
           />
+          {preview && (
+            <img
+              src={preview}
+              alt="Preview"
+              style={{
+                marginTop: "12px",
+                maxHeight: "160px",
+                borderRadius: "8px",
+                display: "block",
+              }}
+            />
+          )}
         </div>
 
         <button
@@ -156,5 +195,4 @@ const inputStyle = {
   fontSize: "15px",
   outline: "none",
 };
-
 export default AddProduct;

@@ -1,6 +1,8 @@
+
 import React from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { removeFromCart, addToCart } from "../redux/cartSlice";
 import "../styles/cart.css";
 
@@ -9,8 +11,9 @@ const Cart = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const handleRemove = (id) => {
+  const handleRemove = (id, name) => {
     dispatch(removeFromCart(id));
+    toast.success(`${name} removed from cart`);
   };
 
   const handleUpdateQty = (item, qty) => {
@@ -54,7 +57,7 @@ const Cart = () => {
                     </button>
                   </div>
                   <button
-                    onClick={() => handleRemove(item.productId)}
+                    onClick={() => handleRemove(item.productId, item.name)}
                     className="btn-remove"
                   >
                     Remove

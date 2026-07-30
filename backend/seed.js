@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const bcrypt = require("bcryptjs");
@@ -11,8 +12,8 @@ connectDB();
 
 const importData = async () => {
   try {
-    // await User.deleteMany();
-    // await Product.deleteMany();
+    await User.deleteMany();
+    await Product.deleteMany();
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash("password123", salt);
@@ -22,6 +23,15 @@ const importData = async () => {
       email: "admin@shopnest.com",
       password: hashedPassword,
       role: "admin",
+      verified: true,
+    });
+
+    const demoUser = await User.create({
+      name: "Demo Customer",
+      email: "customer@shopnest.com",
+      password: hashedPassword,
+      role: "user",
+      verified: true,
     });
 
     const products = [

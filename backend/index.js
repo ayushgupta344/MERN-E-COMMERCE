@@ -1,5 +1,9 @@
+
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const path = require("path");
@@ -9,6 +13,18 @@ connectDB();
 
 const app = express();
 
+// Security headers. Cross-origin resource policy is relaxed for images
+// (Cloudinary) that the frontend loads across origins.
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
+
+if (process.env.NODE_ENV !== "production") {
+  app.use(morgan("dev"));
+}
+
 // Middleware
 app.use(
   cors({
@@ -16,13 +32,23 @@ app.use(
       "http://localhost:5173", // Vite Dev Server
       "http://127.0.0.1:5173",
       process.env.FRONTEND_URL, // Production URL
-    ],
+    ].filter(Boolean),
     credentials: true,
   }),
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Basic brute-force protection on auth endpoints (login, register, OTP).
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  message: { message: "Too many attempts, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/auth", authLimiter);
 
 // API Routes
 app.use("/api/auth", require("./routes/userRoutes"));
@@ -45,6 +71,20 @@ if (process.env.NODE_ENV === "production") {
     res.send("🚀 ShopNest API is running...");
   });
 }
+
+// 404 handler for unmatched API routes
+app.use("/api", (req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+// Centralized error handler - catches anything thrown/passed to next()
+// that individual controllers didn't already handle (e.g. multer errors).
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(err.status || 500).json({
+    message: err.message || "Something went wrong on the server",
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 
