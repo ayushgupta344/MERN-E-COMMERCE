@@ -1,4 +1,3 @@
-
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -59,17 +58,17 @@ const registerUser = async (req, res) => {
       otpExpiry,
     });
 
-    // Email delivery failure shouldn't fail registration - user can hit "resend OTP"
-    try {
-      const message = `Welcome to ShopNest, ${name}! Thank you for registering.\nYour OTP for ShopNest is ${otp}. It expires in 10 minutes.`;
-      await sendEmail(
-        email,
-        "Welcome to ShopNest - Your OTP for registration!",
-        message,
-      );
-    } catch (emailError) {
+    // Fire the OTP email off WITHOUT awaiting it. Gmail SMTP from a cloud
+    // host can take several seconds (sometimes much longer) - blocking the
+    // response on that made registration feel frozen. The frontend has a
+    // "Resend OTP" button as a fallback if this email is slow or fails.
+    sendEmail(
+      email,
+      "Welcome to ShopNest - Your OTP for registration!",
+      `Welcome to ShopNest, ${name}! Thank you for registering.\nYour OTP for ShopNest is ${otp}. It expires in 10 minutes.`,
+    ).catch((emailError) => {
       console.error("Registration OTP email failed:", emailError.message);
-    }
+    });
 
     // No token yet - the account is unverified until OTP is confirmed.
     res.status(201).json({
@@ -170,7 +169,6 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
     if (user && (await bcrypt.compare(password, user.password))) {
       if (!user.verified) {
-        // Give the client everything it needs to route straight to the OTP screen.
         return res.status(403).json({
           message: "Please verify your email before logging in",
           requiresVerification: true,

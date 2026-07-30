@@ -1,4 +1,3 @@
-
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const { sendEmail } = require("../utils/sendEmail");
@@ -42,12 +41,15 @@ const createOrder = async (req, res) => {
       await order.save();
       // Order is already saved at this point - a flaky email provider should
       // never turn a successful order into a 500 for the customer.
-      try {
-        const message = ` Dear ${req.user.name}, \nYour order has been placed successfully.\n Order ID: ${order._id} Address: ${address.fullName}, ${address.street}, ${address.city}, ${address.postalCode}, ${address.country}. \nTotal Amount: ₹${totalAmount}. \nThank you for shopping with us!`;
-        await sendEmail(req.user.email, "Order Confirmation", message);
-      } catch (emailError) {
+      // Fire the confirmation email without awaiting it - same reason as
+      // registration: Gmail SMTP latency shouldn't hold up the order response.
+      sendEmail(
+        req.user.email,
+        "Order Confirmation",
+        ` Dear ${req.user.name}, \nYour order has been placed successfully.\n Order ID: ${order._id} Address: ${address.fullName}, ${address.street}, ${address.city}, ${address.postalCode}, ${address.country}. \nTotal Amount: ₹${totalAmount}. \nThank you for shopping with us!`,
+      ).catch((emailError) => {
         console.error("Order confirmation email failed:", emailError.message);
-      }
+      });
       res.status(201).json({ message: "Order created successfully", order });
     }
   } catch (error) {
@@ -94,6 +96,3 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 module.exports = { createOrder, getOrders, getMyOrders, updateOrderStatus };
-
-
-
