@@ -1,4 +1,3 @@
-
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -12,6 +11,11 @@ dotenv.config();
 connectDB();
 
 const app = express();
+
+// Render (and most PaaS hosts) sit behind a reverse proxy, which sets
+// X-Forwarded-For. Without this, express-rate-limit can't reliably tell
+// users apart and logs a warning on every request.
+app.set("trust proxy", 1);
 
 // Security headers. Cross-origin resource policy is relaxed for images
 // (Cloudinary) that the frontend loads across origins.
