@@ -1,41 +1,40 @@
-const nodemailer = require("nodemailer");
-
-// Generic SMTP transport - works with Brevo, SendGrid, Mailgun, or any
-// transactional email provider's SMTP relay. Gmail's own SMTP
-// (smtp.gmail.com) is deliberately avoided here: Google frequently blocks or
-// times out direct SMTP connections coming from cloud host IP ranges
-// (Render, Railway, Heroku, etc.) as an anti-spam measure, which is why
-// registration/order emails were timing out in production.
-let transporter;
-const getTransporter = () => {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: Number(process.env.EMAIL_PORT) || 587,
-      secure: Number(process.env.EMAIL_PORT) === 465, // true for 465, false for 587/2525
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      connectionTimeout: 10000, // fail fast instead of hanging for minutes
-    });
-  }
-  return transporter;
-};
+// Uses Brevo's HTTP Transactional Email API instead of SMTP.
+//
+// Render's free web services block ALL outbound SMTP ports (25, 465, 587) -
+// this applies regardless of which SMTP provider you point at, which is why
+// switching from Gmail to Brevo's SMTP relay still timed out. Only a paid
+// Render instance lifts that restriction. The HTTP API sidesteps the problem
+// entirely: it's a normal HTTPS POST request on port 443, same as any other
+// API call, so it works fine on the free tier.
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 const sendEmail = async (to, subject, message, html) => {
-  try {
-    const mailOptions = {
-      from: `"ShopNest" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      text: message,
-      ...(html ? { html } : {}),
-    };
+  if (!process.env.BREVO_API_KEY) {
+    throw new Error("BREVO_API_KEY is not set");
+  }
 
-    await getTransporter().sendMail(mailOptions);
-  } catch (error) {
-    console.error("Error sending email:", error.message);
+  const response = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: {
+        name: "ShopNest",
+        email: process.env.EMAIL_FROM,
+      },
+      to: [{ email: to }],
+      subject,
+      textContent: message,
+      ...(html ? { htmlContent: html } : {}),
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error(`Brevo API error (${response.status}):`, errorBody);
     throw new Error("Email could not be sent");
   }
 };
