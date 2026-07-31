@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +11,14 @@ const Checkout = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [processing, setProcessing] = useState(false);
+
+  // Pre-fetched as soon as the page loads, NOT inside the click handler.
+  // Razorpay's checkout window must open synchronously within the click
+  // event to be trusted as a real user action - if there's an `await`
+  // (e.g. fetching the order) between the click and rzp1.open(), browsers
+  // often block it or render it as a blank popup instead of the real modal.
+  const [razorpayOrder, setRazorpayOrder] = useState(null);
+  const [demoModeOnly, setDemoModeOnly] = useState(false);
 
   const [address, setAddress] = useState({
     fullName: "",
@@ -33,6 +40,34 @@ const Checkout = () => {
     (acc, item) => acc + item.price * item.qty,
     0,
   );
+
+  useEffect(() => {
+    if (totalPrice <= 0) return;
+
+    const prepareOrder = async () => {
+      try {
+        const orderRes = await fetch("/api/payment/order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: totalPrice }),
+        });
+        const orderData = await orderRes.json();
+
+        if (!orderRes.ok) {
+          // Razorpay isn't configured on the backend - fall back to demo mode.
+          setDemoModeOnly(true);
+          return;
+        }
+        setRazorpayOrder(orderData);
+      } catch (error) {
+        console.error(error);
+        setDemoModeOnly(true);
+      }
+    };
+
+    prepareOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPrice]);
 
   const saveOrder = async (paymentId) => {
     const saveOrderRes = await fetch("/api/orders", {
@@ -59,85 +94,66 @@ const Checkout = () => {
   };
 
   const runDemoPayment = async () => {
-    // Used when Razorpay isn't configured on the backend yet, so the
+    // Used when Razorpay isn't configured on the backend, so the
     // checkout flow is still demonstrable end-to-end without live keys.
-    await saveOrder("demo_txn_" + Date.now());
-  };
-
-  const handlePayment = async () => {
     setProcessing(true);
     try {
-      const orderRes = await fetch("/api/payment/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: totalPrice }),
-      });
-      const orderData = await orderRes.json();
-
-      if (!orderRes.ok) {
-        const useDemoMode = window.confirm(
-          "Online payments aren't configured on this server yet.\n\nContinue with a demo order instead?",
-        );
-        if (useDemoMode) {
-          await runDemoPayment();
-        } else {
-          toast.error("Payment could not be initialized");
-        }
-        return;
-      }
-
-      if (!window.Razorpay) {
-        toast.error(
-          "Payment gateway failed to load. Please refresh and try again.",
-        );
-        return;
-      }
-
-      const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: orderData.amount,
-        currency: orderData.currency,
-        name: "ShopNest",
-        description: "Order Payment",
-        order_id: orderData.id,
-        handler: async function (response) {
-          try {
-            const verifyRes = await fetch("/api/payment/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(response),
-            });
-            if (verifyRes.ok) {
-              await saveOrder(response.razorpay_payment_id);
-            } else {
-              toast.error("Payment verification failed");
-            }
-          } catch (error) {
-            console.error(error);
-            toast.error("Something went wrong while confirming your payment");
-          }
-        },
-        modal: {
-          ondismiss: () => setProcessing(false),
-        },
-        prefill: {
-          name: address.fullName,
-          email: user?.email,
-          contact: "9999999999",
-        },
-        theme: {
-          color: "#f97316",
-        },
-      };
-
-      const rzp1 = new window.Razorpay(options);
-      rzp1.open();
-    } catch (error) {
-      console.error(error);
-      toast.error("Something went wrong. Please try again.");
+      await saveOrder("demo_txn_" + Date.now());
     } finally {
       setProcessing(false);
     }
+  };
+
+  const openRazorpayCheckout = () => {
+    if (!window.Razorpay) {
+      toast.error("Payment gateway failed to load. Please refresh and try again.");
+      return;
+    }
+
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      name: "ShopNest",
+      description: "Order Payment",
+      order_id: razorpayOrder.id,
+      handler: async function (response) {
+        try {
+          const verifyRes = await fetch("/api/payment/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(response),
+          });
+          if (verifyRes.ok) {
+            await saveOrder(response.razorpay_payment_id);
+          } else {
+            toast.error("Payment verification failed");
+          }
+        } catch (error) {
+          console.error(error);
+          toast.error("Something went wrong while confirming your payment");
+        } finally {
+          setProcessing(false);
+        }
+      },
+      modal: {
+        ondismiss: () => setProcessing(false),
+      },
+      prefill: {
+        name: address.fullName,
+        email: user?.email,
+        contact: "9999999999",
+      },
+      theme: {
+        color: "#f97316",
+      },
+    };
+
+    // This runs synchronously inside the click handler below - no `await`
+    // in between - so the browser treats it as a direct, trusted user
+    // action instead of blocking it as an unexpected popup.
+    const rzp1 = new window.Razorpay(options);
+    rzp1.open();
   };
 
   const handleSubmit = (e) => {
@@ -147,7 +163,30 @@ const Checkout = () => {
       navigate("/login", { state: { from: "/checkout" } });
       return;
     }
-    handlePayment();
+
+    setProcessing(true);
+
+    if (razorpayOrder) {
+      openRazorpayCheckout();
+      return;
+    }
+
+    if (demoModeOnly) {
+      const useDemoMode = window.confirm(
+        "Online payments aren't configured on this server yet.\n\nContinue with a demo order instead?",
+      );
+      if (useDemoMode) {
+        runDemoPayment();
+      } else {
+        setProcessing(false);
+      }
+      return;
+    }
+
+    // Still waiting on the pre-fetch from page load - shouldn't normally
+    // happen since it kicks off immediately, but guard against a slow network.
+    toast.error("Still preparing your payment - please try again in a moment.");
+    setProcessing(false);
   };
 
   if (cartItems.length === 0) return null;
